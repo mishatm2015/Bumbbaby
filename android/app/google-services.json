@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "40857057813",
+    "project_id": "babybloom-9d7e6",
+    "storage_bucket": "babybloom-9d7e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:40857057813:android:5b36c3a9633a0378602c1c",
+        "android_client_info": {
+          "package_name": "com.example.mamabloom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKLnpHmGXYQnbL_SfrmDuW3ZSK1wJ4sRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
