@@ -3,6 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/hydration.dart';
+import '../models/pregnancy_progress.dart';
+import '../services/auth_service.dart';
+import '../services/hydration_service.dart';
+import '../services/user_repository.dart';
+
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
 
@@ -11,24 +17,50 @@ class WellnessScreen extends StatefulWidget {
 }
 
 class _WellnessScreenState extends State<WellnessScreen> {
-  // Hydration: each cup = 250 ml; goal = 12 cups (3 L)
-  static const _totalCups = 12;
-  int _loggedCups = 7; // 1.8 L
+  final _userRepo = UserRepository();
 
-  void _logCup(int index) {
+  HydrationGoal _goal = const HydrationGoal(2.4); // sensible default
+  int _loggedCups = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final cups = await HydrationService.getTodayCups();
+
+    HydrationGoal goal = _goal;
+    final uid = AuthService().currentUser?.uid;
+    if (uid != null) {
+      final profile = await _userRepo.getProfile(uid);
+      final weightKg =
+          HydrationGoal.parseWeightKg(profile?.prePregnancyWeight);
+      final trimester = PregnancyProgress.fromLmp(profile?.lmp)?.trimester ?? 1;
+      goal = HydrationGoal.compute(weightKg: weightKg, trimester: trimester);
+    }
+
+    if (!mounted) return;
     setState(() {
-      if (index < _loggedCups) {
-        _loggedCups = index; // tap a filled cup to unfill
-      } else {
-        _loggedCups = index + 1;
-      }
+      _goal = goal;
+      _loggedCups = cups.clamp(0, goal.cups);
+      _loading = false;
     });
+  }
+
+  Future<void> _logCup(int index) async {
+    final newCount = index < _loggedCups ? index : index + 1;
+    setState(() => _loggedCups = newCount);
+    await HydrationService.setTodayCups(newCount);
   }
 
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
-    final double litres = _loggedCups * 0.25;
+    final totalCups = _goal.cups;
+    final double litres = _loggedCups * HydrationGoal.cupLitres;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FC),
@@ -58,8 +90,10 @@ class _WellnessScreenState extends State<WellnessScreen> {
           const SizedBox(height: 12),
           _HydrationCard(
             loggedCups: _loggedCups,
-            totalCups: _totalCups,
+            totalCups: totalCups,
             litres: litres,
+            goalLitres: _goal.litres,
+            loading: _loading,
             onTap: _logCup,
           ),
           const SizedBox(height: 22),
@@ -187,17 +221,23 @@ class _HydrationCard extends StatelessWidget {
     required this.loggedCups,
     required this.totalCups,
     required this.litres,
+    required this.goalLitres,
+    required this.loading,
     required this.onTap,
   });
 
   final int loggedCups;
   final int totalCups;
   final double litres;
+  final double goalLitres;
+  final bool loading;
   final void Function(int index) onTap;
 
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
+    const perRow = 6;
+    final rows = (totalCups / perRow).ceil();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -219,7 +259,7 @@ class _HydrationCard extends StatelessWidget {
             height: 80,
             child: CustomPaint(
               painter: _RingPainter(
-                progress: loggedCups / totalCups,
+                progress: totalCups == 0 ? 0 : loggedCups / totalCups,
                 trackColor: const Color(0xFFE8F4FE),
                 fillColor: const Color(0xFF4A9FE8),
               ),
@@ -236,7 +276,7 @@ class _HydrationCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'of 3L',
+                      'of ${goalLitres.toStringAsFixed(1)}L',
                       style: sans(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
@@ -262,12 +302,14 @@ class _HydrationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Cup grid: 2 rows of 6
-                for (int row = 0; row < 2; row++) ...[
+                for (int row = 0; row < rows; row++) ...[
                   if (row > 0) const SizedBox(height: 6),
                   Row(
-                    children: List.generate(6, (col) {
-                      final idx = row * 6 + col;
+                    children: List.generate(perRow, (col) {
+                      final idx = row * perRow + col;
+                      if (idx >= totalCups) {
+                        return const SizedBox(width: 26);
+                      }
                       final filled = idx < loggedCups;
                       return Padding(
                         padding: const EdgeInsets.only(right: 4),
@@ -287,7 +329,9 @@ class _HydrationCard extends StatelessWidget {
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  'Goal: 12 cups (3 litres) daily',
+                  loading
+                      ? 'Calculating your goal…'
+                      : 'Goal: $totalCups cups (${goalLitres.toStringAsFixed(1)} litres) daily',
                   style: sans(
                     fontSize: 11,
                     color: const Color(0xFF9A939E),

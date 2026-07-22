@@ -1,6 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/user_profile.dart';
+import '../services/auth_service.dart';
+import '../services/user_repository.dart';
 import 'medical_records_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -9,6 +13,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FC),
@@ -16,55 +21,87 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: const Color(0xFFF8F9FC),
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () {},
-        ),
+        automaticallyImplyLeading: false,
         title: Text('Profile',
             style: sans(fontWeight: FontWeight.w700, fontSize: 17)),
-        actions: [
-          TextButton(
-            onPressed: () {},
-            child: Text(
-              'Edit',
-              style: sans(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: const Color(0xFFE04B84),
-              ),
+      ),
+      body: uid == null
+          ? const Center(child: Text('Not signed in'))
+          : StreamBuilder<UserProfile?>(
+              stream: UserRepository().watchProfile(uid),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final profile = snapshot.data;
+                final authUser = FirebaseAuth.instance.currentUser;
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                  children: [
+                    _UserCard(
+                      sans: sans,
+                      name: profile?.fullName ??
+                          authUser?.displayName ??
+                          'MamaBloom user',
+                      initials: profile?.initials ??
+                          ((authUser?.displayName?.isNotEmpty ?? false)
+                              ? authUser!.displayName![0].toUpperCase()
+                              : '?'),
+                      edd: profile?.edd,
+                      week: profile?.currentWeek,
+                      lmp: profile?.lmp,
+                      email: profile?.email ?? authUser?.email,
+                    ),
+                    const SizedBox(height: 28),
+                    _SectionHeader('QUICK TOOLS', sans),
+                    const SizedBox(height: 14),
+                    const _QuickToolsGrid(),
+                    const SizedBox(height: 28),
+                    _SectionHeader('SETTINGS & MORE', sans),
+                    const SizedBox(height: 10),
+                    const _SettingsList(),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await AuthService().signOut();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE04B84),
+                          side: const BorderSide(color: Color(0xFFFFD0E0)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          'Sign out',
+                          style: sans(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-        children: [
-          // ── User card ──────────────────────────────────────
-          _UserCard(sans: sans),
-          const SizedBox(height: 28),
-
-          // ── Quick tools ────────────────────────────────────
-          _SectionHeader('QUICK TOOLS', sans),
-          const SizedBox(height: 14),
-          _QuickToolsGrid(),
-          const SizedBox(height: 28),
-
-          // ── Settings & more ────────────────────────────────
-          _SectionHeader('SETTINGS & MORE', sans),
-          const SizedBox(height: 10),
-          _SettingsList(),
-        ],
-      ),
     );
   }
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader(this.title, this.sans);
   final String title;
-  final TextStyle Function({FontWeight? fontWeight, double? fontSize, Color? color, double? letterSpacing}) sans;
+  final TextStyle Function({
+    FontWeight? fontWeight,
+    double? fontSize,
+    Color? color,
+    double? letterSpacing,
+  }) sans;
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +117,32 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── User card ─────────────────────────────────────────────────────────────────
-
 class _UserCard extends StatelessWidget {
-  const _UserCard({required this.sans});
-  final TextStyle Function({FontWeight? fontWeight, double? fontSize, Color? color}) sans;
+  const _UserCard({
+    required this.sans,
+    required this.name,
+    required this.initials,
+    this.edd,
+    this.week,
+    this.lmp,
+    this.email,
+  });
+
+  final TextStyle Function({FontWeight? fontWeight, double? fontSize, Color? color})
+      sans;
+  final String name;
+  final String initials;
+  final String? edd;
+  final int? week;
+  final String? lmp;
+  final String? email;
 
   @override
   Widget build(BuildContext context) {
+    final subtitleParts = <String>[];
+    if (edd != null && edd!.isNotEmpty) subtitleParts.add('EDD: $edd');
+    if (week != null) subtitleParts.add('Week $week');
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -103,15 +158,15 @@ class _UserCard extends StatelessWidget {
           Container(
             width: 56,
             height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFFB39DDB),
+            decoration: const BoxDecoration(
+              color: Color(0xFFB39DDB),
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
-                'A',
+                initials,
                 style: sans(
-                  fontSize: 24,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -119,36 +174,53 @@ class _UserCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Anusha Nair',
-                style: sans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF2D2A32),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: sans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF2D2A32),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'EDD: July 15, 2025 · Week 24',
-                style: sans(
-                  fontSize: 13,
-                  color: const Color(0xFF6B6570),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'LMP: Oct 8, 2024',
-                style: sans(
-                  fontSize: 13,
-                  color: const Color(0xFF6B6570),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+                if (subtitleParts.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitleParts.join(' · '),
+                    style: sans(
+                      fontSize: 13,
+                      color: const Color(0xFF6B6570),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (lmp != null && lmp!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'LMP: $lmp',
+                    style: sans(
+                      fontSize: 13,
+                      color: const Color(0xFF6B6570),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (email != null && email!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    email!,
+                    style: sans(
+                      fontSize: 12,
+                      color: const Color(0xFF9A939E),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -156,9 +228,9 @@ class _UserCard extends StatelessWidget {
   }
 }
 
-// ── Quick tools grid ──────────────────────────────────────────────────────────
-
 class _QuickToolsGrid extends StatelessWidget {
+  const _QuickToolsGrid();
+
   static const _tools = [
     _ToolItem('📅', 'Due date'),
     _ToolItem('⏱️', 'Contraction\ntimer'),
@@ -227,9 +299,9 @@ class _ToolCard extends StatelessWidget {
   }
 }
 
-// ── Settings list ─────────────────────────────────────────────────────────────
-
 class _SettingsList extends StatelessWidget {
+  const _SettingsList();
+
   static const _items = [
     _SettingItem(
       '🔔',
@@ -278,7 +350,12 @@ class _SettingsList extends StatelessWidget {
             children: [
               _SettingRow(item: _items[i]),
               if (i < _items.length - 1)
-                Divider(height: 1, indent: 58, endIndent: 0, color: const Color(0xFFF0ECF2)),
+                const Divider(
+                  height: 1,
+                  indent: 58,
+                  endIndent: 0,
+                  color: Color(0xFFF0ECF2),
+                ),
             ],
           );
         }),
@@ -324,8 +401,7 @@ class _SettingRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
-                child: Text(item.emoji,
-                    style: const TextStyle(fontSize: 18)),
+                child: Text(item.emoji, style: const TextStyle(fontSize: 18)),
               ),
             ),
             const SizedBox(width: 14),

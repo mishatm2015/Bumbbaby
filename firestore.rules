@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Per-user health trackers (medicine, water, kicks, weight, steps, contractions…)
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
@@ -17,9 +18,18 @@ service cloud.firestore {
         && resource.data.authorId == request.auth.uid;
     }
 
+    // Size chart (weeks 1–40) — readable by signed-in users; seedable once.
     match /weeklyContent/{docId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Trimester overview charts.
+    match /trimesterInfo/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
     }
   }
 }

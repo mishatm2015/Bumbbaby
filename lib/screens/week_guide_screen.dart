@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/pregnancy_progress.dart';
+import '../models/week_content.dart';
+import '../services/auth_service.dart';
+import '../services/user_repository.dart';
+import '../services/week_content_repository.dart';
+
 class WeekGuideScreen extends StatefulWidget {
-  const WeekGuideScreen({super.key});
+  const WeekGuideScreen({super.key, this.initialWeek});
+
+  /// When null, the screen resolves the current week from the user's LMP.
+  final int? initialWeek;
 
   @override
   State<WeekGuideScreen> createState() => _WeekGuideScreenState();
@@ -10,59 +19,49 @@ class WeekGuideScreen extends StatefulWidget {
 
 class _WeekGuideScreenState extends State<WeekGuideScreen>
     with SingleTickerProviderStateMixin {
-  int _currentWeek = 24;
+  final _contentRepo = WeekContentRepository();
+  final _userRepo = UserRepository();
+
+  late int _currentWeek;
+  late WeekContent _content;
   late TabController _tabController;
 
   static const _totalWeeks = 40;
-
-  static const _weekData = <int, _WeekInfo>{
-    24: _WeekInfo(
-      fruit: 'Corn on the cob',
-      emoji: '🌽',
-      length: '30 cm',
-      weight: '600g',
-      development: [
-        'Inner ear is fully formed — baby can now hear sounds from outside the womb',
-        'Lungs are developing rapidly, practicing breathing movements with amniotic fluid',
-        'Brain is growing at a rapid pace — billions of neurons forming',
-        'Eyelids are almost fully formed and baby may soon open her eyes',
-      ],
-      symptoms: [
-        'Back pain as your centre of gravity shifts',
-        'Braxton Hicks contractions — mild, irregular tightenings',
-        'Swollen feet and ankles in the evenings',
-        'Heartburn and indigestion after meals',
-      ],
-      bodyChanges: [
-        'Uterus is now about the size of a soccer ball, just above your navel',
-        'Braxton Hicks contractions may begin — mild, irregular tightenings',
-        'Back pain and round ligament pain may increase as bump grows',
-      ],
-      tips: [
-        'Sleep on your left side to improve blood flow to baby',
-        'Do gentle prenatal yoga or stretches for back relief',
-        'Stay hydrated — aim for 8–10 glasses of water daily',
-        'Track baby movements — you should feel at least 10 kicks in 2 hours',
-      ],
-      dos: [
-        'Take your iron and folic acid supplements daily',
-        'Eat small frequent meals to ease heartburn',
-        'Wear comfortable, supportive footwear',
-        'Attend your 24-week antenatal checkup',
-      ],
-      donts: [
-        'Avoid sleeping flat on your back for long periods',
-        'Don\'t lift heavy objects without support',
-        'Avoid raw or undercooked foods',
-        'Don\'t ignore severe swelling or headaches',
-      ],
-    ),
-  };
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _currentWeek = widget.initialWeek ?? 24;
+    _content = WeekContent.forWeek(_currentWeek);
+    _loadContent(_currentWeek);
+    if (widget.initialWeek == null) {
+      _resolveCurrentWeekFromProfile();
+    }
+  }
+
+  Future<void> _resolveCurrentWeekFromProfile() async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
+    final profile = await _userRepo.getProfile(uid);
+    final progress = PregnancyProgress.fromLmp(profile?.lmp);
+    if (progress == null || !mounted) return;
+    setState(() => _currentWeek = progress.contentWeek);
+    _loadContent(_currentWeek);
+  }
+
+  Future<void> _loadContent(int week) async {
+    final loaded = await _contentRepo.getWeek(week);
+    if (!mounted || loaded.week != _currentWeek) return;
+    setState(() => _content = loaded);
+  }
+
+  void _goToWeek(int week) {
+    setState(() {
+      _currentWeek = week;
+      _content = WeekContent.forWeek(week);
+    });
+    _loadContent(week);
   }
 
   @override
@@ -71,13 +70,11 @@ class _WeekGuideScreenState extends State<WeekGuideScreen>
     super.dispose();
   }
 
-  _WeekInfo get _info =>
-      _weekData[_currentWeek] ?? _weekData[24]!;
-
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
     final serif = GoogleFonts.fraunces;
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FC),
@@ -85,31 +82,26 @@ class _WeekGuideScreenState extends State<WeekGuideScreen>
         backgroundColor: const Color(0xFFF8F9FC),
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () {},
-        ),
+        automaticallyImplyLeading: false,
+        leading: canPop
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
         title: Text(
           'Week Guide',
           style: sans(fontWeight: FontWeight.w700, fontSize: 17),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_horiz),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
           _WeekCard(
             week: _currentWeek,
-            info: _info,
-            onPrev: _currentWeek > 1
-                ? () => setState(() => _currentWeek--)
-                : null,
+            info: _content,
+            onPrev: _currentWeek > 1 ? () => _goToWeek(_currentWeek - 1) : null,
             onNext: _currentWeek < _totalWeeks
-                ? () => setState(() => _currentWeek++)
+                ? () => _goToWeek(_currentWeek + 1)
                 : null,
             sans: sans,
             serif: serif,
@@ -122,23 +114,23 @@ class _WeekGuideScreenState extends State<WeekGuideScreen>
               children: [
                 _BulletSection(
                   header: 'Baby\'s development this week',
-                  items: _info.development,
+                  items: _content.development,
                   dotColor: const Color(0xFF4A9FE8),
                   bodyHeader: 'Your body this week',
-                  bodyItems: _info.bodyChanges,
+                  bodyItems: _content.bodyChanges,
                   bodyDotColor: const Color(0xFF9ED47A),
                 ),
                 _BulletSection(
                   header: 'Symptoms this week',
-                  items: _info.symptoms,
+                  items: _content.symptoms,
                   dotColor: const Color(0xFFE88A4A),
                 ),
                 _BulletSection(
                   header: 'Tips for week $_currentWeek',
-                  items: _info.tips,
+                  items: _content.tips,
                   dotColor: const Color(0xFFB48AE8),
                 ),
-                _DosDontsTab(dos: _info.dos, donts: _info.donts),
+                _DosDontsTab(dos: _content.dos, donts: _content.donts),
               ],
             ),
           ),
@@ -161,7 +153,7 @@ class _WeekCard extends StatelessWidget {
   });
 
   final int week;
-  final _WeekInfo info;
+  final WeekContent info;
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
   final TextStyle Function({FontWeight? fontWeight, double? fontSize, Color? color}) sans;
@@ -222,16 +214,12 @@ class _WeekCard extends StatelessWidget {
               ],
             ),
           ),
-          // Prev / Next chevrons
           Positioned(
             left: 6,
             top: 0,
             bottom: 0,
             child: Center(
-              child: _NavChevron(
-                icon: Icons.chevron_left,
-                onTap: onPrev,
-              ),
+              child: _NavChevron(icon: Icons.chevron_left, onTap: onPrev),
             ),
           ),
           Positioned(
@@ -239,10 +227,7 @@ class _WeekCard extends StatelessWidget {
             top: 0,
             bottom: 0,
             child: Center(
-              child: _NavChevron(
-                icon: Icons.chevron_right,
-                onTap: onNext,
-              ),
+              child: _NavChevron(icon: Icons.chevron_right, onTap: onNext),
             ),
           ),
         ],
@@ -265,10 +250,14 @@ class _NavChevron extends StatelessWidget {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.25),
+          color: Colors.white.withValues(alpha: onTap == null ? 0.1 : 0.25),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: 20),
+        child: Icon(
+          icon,
+          color: Colors.white.withValues(alpha: onTap == null ? 0.4 : 1),
+          size: 20,
+        ),
       ),
     );
   }
@@ -489,32 +478,4 @@ class _DosDontsSection extends StatelessWidget {
       ],
     );
   }
-}
-
-// ── Data model ────────────────────────────────────────────────────────────────
-
-class _WeekInfo {
-  const _WeekInfo({
-    required this.fruit,
-    required this.emoji,
-    required this.length,
-    required this.weight,
-    required this.development,
-    required this.symptoms,
-    required this.bodyChanges,
-    required this.tips,
-    required this.dos,
-    required this.donts,
-  });
-
-  final String fruit;
-  final String emoji;
-  final String length;
-  final String weight;
-  final List<String> development;
-  final List<String> symptoms;
-  final List<String> bodyChanges;
-  final List<String> tips;
-  final List<String> dos;
-  final List<String> donts;
 }

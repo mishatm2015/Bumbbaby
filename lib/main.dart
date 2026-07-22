@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,8 @@ import 'screens/register_screen.dart';
 import 'screens/week_guide_screen.dart';
 import 'screens/wellness_screen.dart' as ws;
 import 'screens/profile_screen.dart' as ps;
+import 'services/auth_service.dart';
+import 'services/content_seed_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,7 +76,7 @@ class MamaBloomApp extends StatelessWidget {
   }
 }
 
-/// Decides whether to show [LoginScreen], [RegisterScreen], or [HomeScreen].
+/// Listens to Firebase Auth and shows login or home.
 class _AppEntry extends StatefulWidget {
   const _AppEntry();
 
@@ -84,23 +87,38 @@ class _AppEntry extends StatefulWidget {
 enum _AuthView { login, register }
 
 class _AppEntryState extends State<_AppEntry> {
-  bool _loggedIn = false;
+  final _auth = AuthService();
   _AuthView _view = _AuthView.login;
 
   @override
   Widget build(BuildContext context) {
-    if (_loggedIn) return const HomeScreen();
+    return StreamBuilder<User?>(
+      stream: _auth.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    if (_view == _AuthView.register) {
-      return RegisterScreen(
-        onRegister: () => setState(() => _loggedIn = true),
-        onSignIn: () => setState(() => _view = _AuthView.login),
-      );
-    }
+        if (snapshot.data != null) {
+          // Upload size chart + trimester charts once (no-op if already seeded).
+          ContentSeedService.seedIfNeeded();
+          return const HomeScreen();
+        }
 
-    return LoginScreen(
-      onLogin: () => setState(() => _loggedIn = true),
-      onRegister: () => setState(() => _view = _AuthView.register),
+        if (_view == _AuthView.register) {
+          return RegisterScreen(
+            onRegister: () {},
+            onSignIn: () => setState(() => _view = _AuthView.login),
+          );
+        }
+
+        return LoginScreen(
+          onLogin: () {},
+          onRegister: () => setState(() => _view = _AuthView.register),
+        );
+      },
     );
   }
 }
@@ -154,6 +172,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-
-

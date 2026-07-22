@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/auth_service.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
@@ -8,7 +10,7 @@ class LoginScreen extends StatefulWidget {
     required this.onRegister,
   });
 
-  /// Called when the user taps Sign In or Continue with Google.
+  /// Called after a successful sign-in.
   final VoidCallback onLogin;
 
   /// Called when the user taps "Register here".
@@ -19,9 +21,52 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _auth = AuthService();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
+  bool _loading = false;
+
+  Future<void> _signIn() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('Enter email and password.');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await _auth.signIn(email: email, password: password);
+      if (!mounted) return;
+      widget.onLogin();
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthService.messageFor(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      _showMessage('Enter your email first.');
+      return;
+    }
+    try {
+      await _auth.sendPasswordReset(email);
+      if (!mounted) return;
+      _showMessage('Password reset email sent.');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthService.messageFor(e));
+    }
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   static const _purple = Color(0xFF4C3FD4);
   static const _labelGrey = Color(0xFF6B6570);
@@ -143,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _loading ? null : _forgotPassword,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     minimumSize: Size.zero,
@@ -166,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: widget.onLogin,
+                  onPressed: _loading ? null : _signIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _purple,
                     foregroundColor: Colors.white,
@@ -175,14 +220,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: Text(
-                    'Sign in',
-                    style: sans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Sign in',
+                          style: sans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -207,12 +261,16 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ── Google button ─────────────────────────────────
+              // ── Google button (OAuth not configured yet) ──────
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: OutlinedButton(
-                  onPressed: widget.onLogin,
+                  onPressed: _loading
+                      ? null
+                      : () => _showMessage(
+                            'Google Sign-In needs OAuth setup in Firebase Console.',
+                          ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF1A1A2E),
                     side: const BorderSide(color: Color(0xFFE0DEE5), width: 1.5),
@@ -223,7 +281,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Simple G logo
                       const _GoogleIcon(),
                       const SizedBox(width: 10),
                       Text(
