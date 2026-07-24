@@ -62,16 +62,21 @@ class _BmiWeightScreenState extends State<BmiWeightScreen> {
     return cur - pre;
   }
 
-  double? get _bmi {
+  double? _bmiFromWeight(double? weightKg) {
     final h = _heightCm;
-    final w = _preWeightKg;
+    final w = weightKg;
     if (h == null || w == null || h <= 0) return null;
     final m = h / 100;
     return w / (m * m);
   }
 
-  String get _bmiCategory {
-    final bmi = _bmi;
+  /// BMI from the latest logged weight (updates when you add/change weight).
+  double? get _bmi => _bmiFromWeight(_currentWeightKg);
+
+  /// Pre-pregnancy BMI — used for IOM recommended gain ranges.
+  double? get _prePregnancyBmi => _bmiFromWeight(_preWeightKg);
+
+  String _categoryFor(double? bmi) {
     if (bmi == null) return 'Add height & weight';
     if (bmi < 18.5) return 'Underweight';
     if (bmi < 25.0) return 'Normal weight';
@@ -79,9 +84,11 @@ class _BmiWeightScreenState extends State<BmiWeightScreen> {
     return 'Obese';
   }
 
+  String get _bmiCategory => _categoryFor(_bmi);
+
   /// Recommended total gain range (kg) per IOM guidelines by pre-preg BMI.
   String get _recommendation {
-    final bmi = _bmi;
+    final bmi = _prePregnancyBmi;
     if (bmi == null) {
       return 'Add your height and pre-pregnancy weight in your profile to see a personalized recommendation.';
     }
@@ -96,7 +103,8 @@ class _BmiWeightScreenState extends State<BmiWeightScreen> {
       range = '5–9 kg';
     }
     final wk = _currentWeek != null ? ' (currently week $_currentWeek)' : '';
-    return 'For your BMI ($_bmiCategory), a total gain of $range across pregnancy is recommended$wk.';
+    final preCat = _categoryFor(bmi);
+    return 'Based on your pre-pregnancy BMI ($preCat, ${bmi.toStringAsFixed(1)}), a total gain of $range across pregnancy is recommended$wk.';
   }
 
   Future<void> _addWeight() async {
@@ -166,7 +174,12 @@ class _BmiWeightScreenState extends State<BmiWeightScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _BmiCard(bmi: _bmi, category: _bmiCategory, sans: sans),
+                  _BmiCard(
+                    bmi: _bmi,
+                    category: _bmiCategory,
+                    prePregnancyBmi: _prePregnancyBmi,
+                    sans: sans,
+                  ),
                   const SizedBox(height: 24),
                   _StatsGrid(
                     sans: sans,
@@ -264,10 +277,16 @@ class _BmiWeightScreenState extends State<BmiWeightScreen> {
 // ── BMI Card ──────────────────────────────────────────────────────────────────
 
 class _BmiCard extends StatelessWidget {
-  const _BmiCard({required this.bmi, required this.category, required this.sans});
+  const _BmiCard({
+    required this.bmi,
+    required this.category,
+    required this.sans,
+    this.prePregnancyBmi,
+  });
 
   final double? bmi;
   final String category;
+  final double? prePregnancyBmi;
   final TextStyle Function({FontWeight? fontWeight, double? fontSize, Color? color})
       sans;
 
@@ -287,7 +306,7 @@ class _BmiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('PRE-PREGNANCY BMI',
+          Text('CURRENT BMI',
               style: sans(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -303,6 +322,17 @@ class _BmiCard extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF7A5200))),
+          if (prePregnancyBmi != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Pre-pregnancy BMI: ${prePregnancyBmi!.toStringAsFixed(1)}',
+              style: sans(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF7A5200),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           _BmiSlider(bmi: bmi ?? 21.5),
         ],

@@ -31,5 +31,12 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null;
     }
+
+    // Pregnancy nutrition food catalog.
+    match /foods/{foodId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
   }
 }

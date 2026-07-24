@@ -13,6 +13,8 @@ import 'screens/wellness_screen.dart' as ws;
 import 'screens/profile_screen.dart' as ps;
 import 'services/auth_service.dart';
 import 'services/content_seed_service.dart';
+import 'services/notification_service.dart';
+import 'services/nutrition_seed_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,12 @@ Future<void> main() async {
     );
   } catch (e, stack) {
     debugPrint('Firebase.initializeApp failed: $e');
+    if (kDebugMode) debugPrintStack(stackTrace: stack);
+  }
+  try {
+    await NotificationService.init();
+  } catch (e, stack) {
+    debugPrint('NotificationService.init failed: $e');
     if (kDebugMode) debugPrintStack(stackTrace: stack);
   }
   runApp(const MamaBloomApp());
@@ -102,8 +110,9 @@ class _AppEntryState extends State<_AppEntry> {
         }
 
         if (snapshot.data != null) {
-          // Upload size chart + trimester charts once (no-op if already seeded).
+          // Upload size chart, trimester charts, and nutrition foods once.
           ContentSeedService.seedIfNeeded();
+          NutritionSeedService.seedIfNeeded();
           return const HomeScreen();
         }
 

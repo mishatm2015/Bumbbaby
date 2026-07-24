@@ -46,13 +46,16 @@ class UserProfile {
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
-  /// Gestational week from LMP (DD/MM/YYYY), clamped 1–42. Null if unparsable.
+  /// Gestational week you are in (1–40), same formula as [PregnancyProgress.contentWeek].
   int? get currentWeek {
     final lmpDate = _parseDdMmYyyy(lmp);
     if (lmpDate == null) return null;
-    final days = DateTime.now().difference(lmpDate).inDays;
+    final today = DateTime.now();
+    final days = DateTime(today.year, today.month, today.day)
+        .difference(DateTime(lmpDate.year, lmpDate.month, lmpDate.day))
+        .inDays;
     if (days < 0) return 1;
-    return (days ~/ 7 + 1).clamp(1, 42);
+    return ((days ~/ 7) + 1).clamp(1, 40);
   }
 
   Map<String, dynamic> toMap() {

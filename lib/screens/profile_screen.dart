@@ -2,10 +2,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/pregnancy_progress.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/user_repository.dart';
+import 'bmi_weight_screen.dart';
+import 'contraction_timer_screen.dart';
+import 'hospital_bag_screen.dart';
+import 'kick_counter_screen.dart';
 import 'medical_records_screen.dart';
+import 'music_mantras_screen.dart';
+import 'reminders_screen.dart';
+import 'week_guide_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -56,7 +64,7 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 28),
                     _SectionHeader('QUICK TOOLS', sans),
                     const SizedBox(height: 14),
-                    const _QuickToolsGrid(),
+                    _QuickToolsGrid(profile: profile),
                     const SizedBox(height: 28),
                     _SectionHeader('SETTINGS & MORE', sans),
                     const SizedBox(height: 10),
@@ -228,17 +236,181 @@ class _UserCard extends StatelessWidget {
   }
 }
 
+enum _QuickTool {
+  dueDate,
+  contractionTimer,
+  kickCounter,
+  bmiCheck,
+  weightTracker,
+  hospitalBag,
+}
+
 class _QuickToolsGrid extends StatelessWidget {
-  const _QuickToolsGrid();
+  const _QuickToolsGrid({this.profile});
+
+  final UserProfile? profile;
 
   static const _tools = [
-    _ToolItem('📅', 'Due date'),
-    _ToolItem('⏱️', 'Contraction\ntimer'),
-    _ToolItem('👶', 'Kick counter'),
-    _ToolItem('⚖️', 'BMI check'),
-    _ToolItem('📊', 'Weight\ntracker'),
-    _ToolItem('🎒', 'Hospital bag'),
+    _ToolItem(_QuickTool.dueDate, '📅', 'Due date'),
+    _ToolItem(_QuickTool.contractionTimer, '⏱️', 'Contraction\ntimer'),
+    _ToolItem(_QuickTool.kickCounter, '👶', 'Kick counter'),
+    _ToolItem(_QuickTool.bmiCheck, '⚖️', 'BMI check'),
+    _ToolItem(_QuickTool.weightTracker, '📊', 'Weight\ntracker'),
+    _ToolItem(_QuickTool.hospitalBag, '🎒', 'Hospital bag'),
   ];
+
+  void _openTool(BuildContext context, _QuickTool tool) {
+    switch (tool) {
+      case _QuickTool.dueDate:
+        _showDueDateSheet(context, profile);
+        return;
+      case _QuickTool.contractionTimer:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const ContractionTimerScreen(),
+          ),
+        );
+        return;
+      case _QuickTool.kickCounter:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const KickCounterScreen(),
+          ),
+        );
+        return;
+      case _QuickTool.bmiCheck:
+      case _QuickTool.weightTracker:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const BmiWeightScreen(),
+          ),
+        );
+        return;
+      case _QuickTool.hospitalBag:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const HospitalBagScreen(),
+          ),
+        );
+        return;
+    }
+  }
+
+  static String _fmtDate(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd/$mm/${d.year}';
+  }
+
+  static void _showDueDateSheet(BuildContext context, UserProfile? profile) {
+    final sans = GoogleFonts.plusJakartaSans;
+    final progress = PregnancyProgress.fromLmp(profile?.lmp);
+    final eddText = profile?.edd?.trim().isNotEmpty == true
+        ? profile!.edd!
+        : (progress != null ? _fmtDate(progress.edd) : null);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0DCE4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Due date',
+                style: sans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2D2A32),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (eddText != null) ...[
+                Text(
+                  eddText,
+                  style: sans(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFE04B84),
+                  ),
+                ),
+                if (progress != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    '${progress.daysLeft} days left · ${progress.weekDayLabel}',
+                    style: sans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF6B6570),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    progress.trimesterLabel,
+                    style: sans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF9A939E),
+                    ),
+                  ),
+                ],
+              ] else
+                Text(
+                  'Add your LMP or EDD in your profile to see your due date.',
+                  style: sans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF6B6570),
+                  ),
+                ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const WeekGuideScreen(),
+                      ),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE04B84),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    'Open weekly guide',
+                    style: sans(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,51 +421,67 @@ class _QuickToolsGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       childAspectRatio: 1.1,
-      children: _tools.map((t) => _ToolCard(tool: t)).toList(),
+      children: _tools
+          .map(
+            (t) => _ToolCard(
+              tool: t,
+              onTap: () => _openTool(context, t.id),
+            ),
+          )
+          .toList(),
     );
   }
 }
 
 class _ToolItem {
-  const _ToolItem(this.emoji, this.label);
+  const _ToolItem(this.id, this.emoji, this.label);
+  final _QuickTool id;
   final String emoji;
   final String label;
 }
 
 class _ToolCard extends StatelessWidget {
-  const _ToolCard({required this.tool});
+  const _ToolCard({required this.tool, required this.onTap});
   final _ToolItem tool;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(tool.emoji, style: const TextStyle(fontSize: 28)),
-          const SizedBox(height: 6),
-          Text(
-            tool.label,
-            textAlign: TextAlign.center,
-            style: sans(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF2D2A32),
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(tool.emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(height: 6),
+              Text(
+                tool.label,
+                textAlign: TextAlign.center,
+                style: sans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF2D2A32),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -380,10 +568,23 @@ class _SettingRow extends StatelessWidget {
     final sans = GoogleFonts.plusJakartaSans;
     return InkWell(
       onTap: () {
-        if (item.title == 'Medical records') {
+        final title = item.title;
+        if (title == 'Medical records') {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => const MedicalRecordsScreen(),
+            ),
+          );
+        } else if (title == 'Reminders & notifications') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const RemindersScreen(),
+            ),
+          );
+        } else if (title == 'Music & mantras') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const MusicMantrasScreen(),
             ),
           );
         }

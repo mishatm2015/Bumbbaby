@@ -7,7 +7,10 @@ import '../models/hydration.dart';
 import '../models/pregnancy_progress.dart';
 import '../services/auth_service.dart';
 import '../services/hydration_service.dart';
+import '../services/meal_plan_service.dart';
 import '../services/user_repository.dart';
+import 'nutrition_planner_screen.dart';
+import 'medicine_screen.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
@@ -99,28 +102,55 @@ class _WellnessScreenState extends State<WellnessScreen> {
           const SizedBox(height: 22),
 
           // ── Today's meal plan ────────────────────────────────
-          _SectionHeader("TODAY'S MEAL PLAN", sans),
-          const SizedBox(height: 12),
-          _MealPlanGrid(),
+          Row(
+            children: [
+              Expanded(child: _SectionHeader("TODAY'S MEAL PLAN", sans)),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NutritionPlannerScreen(),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Full planner',
+                  style: sans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFE04B84),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _TodaysMealPreview(onOpenPlanner: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const NutritionPlannerScreen(),
+              ),
+            );
+          }),
           const SizedBox(height: 22),
 
           // ── Medicines today ──────────────────────────────────
           _SectionHeader('MEDICINES TODAY', sans),
           const SizedBox(height: 12),
-          _MedicineTile(
-            name: 'Folic Acid 5mg',
-            subtitle: 'Morning with food · Taken ✓',
-            dotColor: const Color(0xFF4CAF6A),
-            icon: Icons.medication_rounded,
-            iconColor: const Color(0xFFE85A5A),
-          ),
-          const SizedBox(height: 10),
-          _MedicineTile(
-            name: 'Iron 100mg',
-            subtitle: 'Afternoon on empty stomach · Pending',
-            dotColor: const Color(0xFFFF9B50),
-            icon: Icons.medication_rounded,
-            iconColor: const Color(0xFFFF9B50),
+          InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MedicineScreen()),
+              );
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: const _MedicineTile(
+              name: 'Open medicine tracker',
+              subtitle: 'Log folic acid, iron & more',
+              dotColor: Color(0xFF4CAF6A),
+              icon: Icons.medication_rounded,
+              iconColor: Color(0xFFE85A5A),
+            ),
           ),
         ],
       ),
@@ -391,26 +421,105 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) => old.progress != progress;
 }
 
-// ── Meal plan grid ────────────────────────────────────────────────────────────
+// ── Meal plan preview (live from Nutrition Planner) ───────────────────────────
 
-class _MealPlanGrid extends StatelessWidget {
+class _TodaysMealPreview extends StatefulWidget {
+  const _TodaysMealPreview({required this.onOpenPlanner});
+  final VoidCallback onOpenPlanner;
+
+  @override
+  State<_TodaysMealPreview> createState() => _TodaysMealPreviewState();
+}
+
+class _TodaysMealPreviewState extends State<_TodaysMealPreview> {
+  final _mealService = MealPlanService();
+  final _userRepo = UserRepository();
+  bool _loading = true;
+  List<_MealItem> _meals = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    var week = 1;
+    var trimester = 1;
+    final uid = AuthService().currentUser?.uid;
+    if (uid != null) {
+      final profile = await _userRepo.getProfile(uid);
+      final progress = PregnancyProgress.fromLmp(profile?.lmp);
+      week = progress?.contentWeek ?? 1;
+      trimester = progress?.trimester ?? 1;
+    }
+    final prefs = await _mealService.loadPrefs();
+    final plan = await _mealService.planForDate(
+      date: DateTime.now(),
+      week: week,
+      trimester: trimester,
+      prefs: prefs,
+    );
+    if (!mounted) return;
+    setState(() {
+      _meals = [
+        _MealItem(
+          plan.breakfast?.emoji ?? '🌄',
+          'Breakfast',
+          plan.breakfast?.name ?? 'Open planner',
+          'Today',
+          const Color(0xFFFFF3E0),
+        ),
+        _MealItem(
+          plan.lunch?.emoji ?? '☀️',
+          'Lunch',
+          plan.lunch?.name ?? 'Open planner',
+          'Today',
+          const Color(0xFFE8F5E9),
+        ),
+        _MealItem(
+          plan.dinner?.emoji ?? '🌙',
+          'Dinner',
+          plan.dinner?.name ?? 'Open planner',
+          'Today',
+          const Color(0xFFE3F2FD),
+        ),
+        _MealItem(
+          plan.morningSnack?.emoji ?? '🍎',
+          'Snack',
+          plan.morningSnack?.name ?? 'Open planner',
+          'Today',
+          const Color(0xFFFCE4EC),
+        ),
+      ];
+      _loading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    const meals = [
-      _MealItem('🌄', 'Breakfast', 'Ragi porridge + banana', 'High iron', Color(0xFFFFF3E0)),
-      _MealItem('☀️', 'Lunch', 'Dal rice + spinach sabzi', 'Vegetarian', Color(0xFFE8F5E9)),
-      _MealItem('🌙', 'Dinner', 'Chapati + paneer curry', 'Vegetarian', Color(0xFFE8F5E9)),
-      _MealItem('🍎', 'Snacks', 'Almonds + dates + milk', 'Calcium boost', Color(0xFFFCE4EC)),
-    ];
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
-      // Lower ratio = taller cells (width/height); avoids meal card bottom overflow.
       childAspectRatio: 1.05,
-      children: meals.map((m) => _MealCard(meal: m)).toList(),
+      children: _meals
+          .map((m) => _MealCard(meal: m, onTap: widget.onOpenPlanner))
+          .toList(),
     );
   }
 }
@@ -425,69 +534,79 @@ class _MealItem {
 }
 
 class _MealCard extends StatelessWidget {
-  const _MealCard({required this.meal});
+  const _MealCard({required this.meal, this.onTap});
   final _MealItem meal;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final sans = GoogleFonts.plusJakartaSans;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(meal.emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 4),
-          Text(
-            meal.label,
-            style: sans(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF9A939E),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Expanded(
-            child: Text(
-              meal.meal,
-              style: sans(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF2D2A32),
-                height: 1.25,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF0E6EA)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: meal.tagColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              meal.tag,
-              style: sans(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF4A4550),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(meal.emoji, style: const TextStyle(fontSize: 24)),
+              const SizedBox(height: 4),
+              Text(
+                meal.label,
+                style: sans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF9A939E),
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Expanded(
+                child: Text(
+                  meal.meal,
+                  style: sans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF2D2A32),
+                    height: 1.25,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: meal.tagColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  meal.tag,
+                  style: sans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF4A4550),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

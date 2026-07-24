@@ -9,6 +9,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   firebase_remote_config
   firebase_storage
+  flutter_timezone
   permission_handler_windows
 )
 

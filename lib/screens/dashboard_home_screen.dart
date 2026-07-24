@@ -32,9 +32,11 @@ import 'week_guide_screen.dart';
 import '../models/medicine.dart';
 import '../models/weight_entry.dart';
 import '../models/kick_session.dart';
+import '../models/appointment.dart';
 import '../services/medicine_service.dart';
 import '../services/weight_service.dart';
 import '../services/kick_service.dart';
+import '../services/appointment_service.dart';
 
 /// Matches optional named parameters on `GoogleFonts.fraunces` / `GoogleFonts.plusJakartaSans`.
 typedef _TextStyleFn = TextStyle Function({
@@ -180,137 +182,189 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
-            child: Row(
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: sans(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      color: DashboardHomeScreen._ink,
-                    ),
-                    children: [
-                      const TextSpan(text: 'mama'),
-                      TextSpan(
-                        text: 'bloom',
-                        style: serif(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+                child: Row(
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: sans(
                           fontSize: 22,
-                          fontWeight: FontWeight.w500,
-                          color: DashboardHomeScreen._bloom,
-                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                          color: DashboardHomeScreen._ink,
+                        ),
+                        children: [
+                          const TextSpan(text: 'mama'),
+                          TextSpan(
+                            text: 'bloom',
+                            style: serif(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w500,
+                              color: DashboardHomeScreen._bloom,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF8FB4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        profile?.initials ?? 'MB',
+                        style: sans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFF8FB4),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    profile?.initials ?? 'MB',
-                    style: sans(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
                     ),
-                  ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: () {},
-                  icon: Icon(Icons.more_horiz,
-                      color: DashboardHomeScreen._muted.withValues(alpha: 0.7)),
+              ),
+              if (progress == null)
+                _SetLmpBanner(sans: sans)
+              else
+                _TrimesterHero(
+                  serif: serif,
+                  sans: sans,
+                  progress: progress,
+                  content: wc,
+                  onTap: openWeekGuide,
                 ),
+              const SizedBox(height: 24),
+              _SectionTitle('TODAY\'S SNAPSHOT', sans),
+              const SizedBox(height: 12),
+              _SnapshotRow(
+                sans: sans,
+                hydrationGoal: hydrationGoal,
+                stepGoal: stepGoal,
+                onWaterTap: openWater,
+                onMedsTap: openMeds,
+                onStepsTap: openSteps,
+              ),
+              const SizedBox(height: 28),
+              if (progress != null) ...[
+                _ProgressBlock(sans: sans, progress: progress),
+                const SizedBox(height: 28),
               ],
-            ),
-          ),
-        ),
-        SliverList(
-          delegate: SliverChildListDelegate([
-            if (progress == null)
-              _SetLmpBanner(sans: sans)
-            else
-              _TrimesterHero(
+              _SectionTitle('TODAY\'S UPDATE', sans),
+              const SizedBox(height: 12),
+              _TodayUpdateCard(
                 serif: serif,
                 sans: sans,
-                progress: progress,
                 content: wc,
+                progress: progress,
                 onTap: openWeekGuide,
               ),
-            const SizedBox(height: 24),
-            _SectionTitle('TODAY\'S SNAPSHOT', sans),
-            const SizedBox(height: 12),
-            _SnapshotRow(
-              sans: sans,
-              hydrationGoal: hydrationGoal,
-              stepGoal: stepGoal,
-              onWaterTap: openWater,
-              onStepsTap: openSteps,
-            ),
-            const SizedBox(height: 28),
-            if (progress != null) ...[
-              _ProgressBlock(serif: serif, sans: sans, progress: progress),
               const SizedBox(height: 28),
-            ],
-            _SectionTitle('TODAY\'S UPDATE', sans),
-            const SizedBox(height: 12),
-            _TodayUpdateCard(
-              serif: serif,
-              sans: sans,
-              content: wc,
-              progress: progress,
-              onTap: openWeekGuide,
-            ),
-            const SizedBox(height: 28),
-            _SectionTitle('HEALTH TRACKERS', sans),
-            const SizedBox(height: 12),
-            _HealthTrackersGrid(
-              sans: sans,
-              hydrationGoal: hydrationGoal,
-              onWaterTap: openWater,
-              onMedsTap: openMeds,
-              onWeightTap: openWeight,
-              onKickTap: openKick,
-              preWeightKg: preWeightKg,
-            ),
-            const SizedBox(height: 28),
-            _SectionTitle('PREGNANCY TOOLKIT', sans),
-            const SizedBox(height: 12),
-            _PregnancyToolkitGrid(sans: sans),
-            const SizedBox(height: 28),
-            _SectionTitle('QUICK LINKS', sans),
-            const SizedBox(height: 12),
-            _QuickLinksRow(sans: sans),
-            const SizedBox(height: 28),
-            _SectionTitle('UPCOMING APPOINTMENTS', sans),
-            const SizedBox(height: 12),
-            _AppointmentTile(
-              sans: sans,
-              dayMonth: '28',
-              month: 'MAR',
-              title: 'Anomaly Scan',
-              subtitle: 'Dr. Priya Nair — Amrita Hospital',
-              time: '10:30 AM',
-            ),
-            const SizedBox(height: 10),
-            _AppointmentTile(
-              sans: sans,
-              dayMonth: '4',
-              month: 'APR',
-              title: 'OB-GYN Checkup',
-              subtitle: 'City Women\'s Clinic',
-              time: '11:00 AM',
-            ),
-            const SizedBox(height: 100),
-          ]),
+              _SectionTitle('HEALTH TRACKERS', sans),
+              const SizedBox(height: 12),
+              _HealthTrackersGrid(
+                sans: sans,
+                hydrationGoal: hydrationGoal,
+                onWaterTap: openWater,
+                onMedsTap: openMeds,
+                onWeightTap: openWeight,
+                onKickTap: openKick,
+                preWeightKg: preWeightKg,
+              ),
+              const SizedBox(height: 28),
+              _SectionTitle('PREGNANCY TOOLKIT', sans),
+              const SizedBox(height: 12),
+              _PregnancyToolkitGrid(
+                sans: sans,
+                onReturn: () {
+                  if (mounted) setState(() {});
+                },
+              ),
+              const SizedBox(height: 28),
+              _SectionTitle('QUICK LINKS', sans),
+              const SizedBox(height: 12),
+              _QuickLinksRow(sans: sans),
+              const SizedBox(height: 28),
+              _SectionTitle('UPCOMING APPOINTMENTS', sans),
+              const SizedBox(height: 12),
+              FutureBuilder<List<Appointment>>(
+                future: AppointmentService.getUpcoming(limit: 3),
+                builder: (context, snap) {
+                  final list = snap.data ?? const <Appointment>[];
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                          child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2))),
+                    );
+                  }
+                  if (list.isEmpty) {
+                    return InkWell(
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const AppointmentsScreen()),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF0E6EA)),
+                        ),
+                        child: Text(
+                          'No appointments yet. Tap to add one.',
+                          style: sans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: DashboardHomeScreen._muted,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      for (var i = 0; i < list.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 10),
+                        _AppointmentTile(
+                          sans: sans,
+                          dayMonth: '${list[i].dateTime.day}',
+                          month: _monthShort(list[i].dateTime.month),
+                          title: list[i].title,
+                          subtitle: list[i].place,
+                          time: _formatTime(list[i].dateTime),
+                          onTap: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AppointmentsScreen()),
+                            );
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 100),
+            ]),
+          ),
         ),
       ],
     );
@@ -326,6 +380,33 @@ String _formatSteps(int steps) {
     buf.write(s[i]);
   }
   return buf.toString();
+}
+
+String _monthShort(int m) {
+  const names = [
+    '',
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC'
+  ];
+  return names[m.clamp(1, 12)];
+}
+
+String _formatTime(DateTime dt) {
+  final h = dt.hour;
+  final m = dt.minute.toString().padLeft(2, '0');
+  final period = h >= 12 ? 'PM' : 'AM';
+  final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+  return '$hour12:$m $period';
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -449,11 +530,11 @@ class _TrimesterHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      progress.weekDayLabel,
+                      '${progress.weekBadge} · ${progress.weekDayLabel}',
                       style: sans(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.1,
+                        letterSpacing: 0.4,
                         color: DashboardHomeScreen._muted,
                       ),
                     ),
@@ -548,6 +629,7 @@ class _SnapshotRow extends StatelessWidget {
     required this.hydrationGoal,
     required this.stepGoal,
     required this.onWaterTap,
+    required this.onMedsTap,
     required this.onStepsTap,
   });
 
@@ -555,6 +637,7 @@ class _SnapshotRow extends StatelessWidget {
   final HydrationGoal hydrationGoal;
   final StepGoal stepGoal;
   final VoidCallback onWaterTap;
+  final VoidCallback onMedsTap;
   final VoidCallback onStepsTap;
 
   Widget _cell({
@@ -622,11 +705,24 @@ class _SnapshotRow extends StatelessWidget {
             );
           },
         ),
-        _cell(
-          icon: Icons.medication_liquid_rounded,
-          iconBg: const Color(0xFFE85A5A),
-          value: '2/3',
-          label: 'Meds taken',
+        FutureBuilder<(int done, int total)>(
+          future: () async {
+            final meds = await MedicineService.getMedicines();
+            final taken = await MedicineService.getTodayTaken();
+            final done = meds.where((m) => taken.contains(m.id)).length;
+            return (done, meds.length);
+          }(),
+          builder: (context, snap) {
+            final done = snap.data?.$1 ?? 0;
+            final total = snap.data?.$2 ?? 0;
+            return _cell(
+              icon: Icons.medication_liquid_rounded,
+              iconBg: const Color(0xFFE85A5A),
+              value: total == 0 ? '—' : '$done/$total',
+              label: total == 0 ? 'Add meds' : 'Meds taken',
+              onTap: onMedsTap,
+            );
+          },
         ),
         FutureBuilder<int>(
           future: StepService.getTodaySteps(),
@@ -648,119 +744,85 @@ class _SnapshotRow extends StatelessWidget {
 
 class _ProgressBlock extends StatelessWidget {
   const _ProgressBlock({
-    required this.serif,
     required this.sans,
     required this.progress,
   });
 
-  final _TextStyleFn serif;
   final _TextStyleFn sans;
   final PregnancyProgress progress;
 
   @override
   Widget build(BuildContext context) {
-    final fraction = progress.fraction;
+    final week = progress.contentWeek;
+    final pct = progress.percent.round();
+    final fraction = progress.fraction.clamp(0.0, 1.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
-              'Pregnancy progress',
-              style: serif(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              'Week $week',
+              style: sans(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
                 color: DashboardHomeScreen._ink,
               ),
             ),
             const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFE0EC),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                progress.trimesterShort,
-                style: sans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFC94F7D),
-                ),
+            Text(
+              '$pct%',
+              style: sans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFE04B84),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, constraints) {
             final w = constraints.maxWidth;
-            final markerFrac = fraction.clamp(0.0, 1.0);
-            return Column(
-              children: [
-                SizedBox(
-                  height: 28,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: fraction,
-                            minHeight: 10,
-                            backgroundColor: const Color(0xFFF0E8EC),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFFF7BAC),
-                            ),
-                          ),
-                        ),
+            final thumb = (w * fraction - 7).clamp(0.0, w - 14);
+            return SizedBox(
+              height: 16,
+              child: Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      minHeight: 10,
+                      backgroundColor: const Color(0xFFF0E8EC),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFFF7BAC),
                       ),
-                      Positioned(
-                        left: (w * markerFrac - 6).clamp(0.0, w - 12),
-                        top: 0,
-                        child: const Icon(
-                          Icons.arrow_drop_up,
-                          size: 28,
-                          color: Color(0xFFFF5A9A),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      'Week 1',
-                      style: sans(
-                        fontSize: 11,
-                        color: DashboardHomeScreen._muted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Wk ${progress.weeks}',
-                      style: sans(
-                        fontSize: 11,
+                  Positioned(
+                    left: thumb,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
                         color: const Color(0xFFE04B84),
-                        fontWeight: FontWeight.w700,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE04B84).withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
-                    const Spacer(),
-                    Text(
-                      'Week 40',
-                      style: sans(
-                        fontSize: 11,
-                        color: DashboardHomeScreen._muted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -1275,6 +1337,7 @@ class _AppointmentTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.time,
+    this.onTap,
   });
 
   final _TextStyleFn sans;
@@ -1283,99 +1346,110 @@ class _AppointmentTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final String time;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF0E6EA)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE0EC),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  dayMonth,
-                  style: sans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFFD94A7A),
-                    height: 1,
-                  ),
-                ),
-                Text(
-                  month,
-                  style: sans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFC94F7D),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF0E6EA)),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: sans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: DashboardHomeScreen._ink,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE0EC),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: sans(
-                    fontSize: 12,
-                    color: DashboardHomeScreen._muted,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      dayMonth,
+                      style: sans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFD94A7A),
+                        height: 1,
+                      ),
+                    ),
+                    Text(
+                      month,
+                      style: sans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFC94F7D),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: sans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: DashboardHomeScreen._ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: sans(
+                        fontSize: 12,
+                        color: DashboardHomeScreen._muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                time,
+                style: sans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: DashboardHomeScreen._muted,
+                ),
+              ),
+            ],
           ),
-          Text(
-            time,
-            style: sans(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: DashboardHomeScreen._muted,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _PregnancyToolkitGrid extends StatelessWidget {
-  const _PregnancyToolkitGrid({required this.sans});
+  const _PregnancyToolkitGrid({required this.sans, required this.onReturn});
 
   final _TextStyleFn sans;
+  final VoidCallback onReturn;
 
   @override
   Widget build(BuildContext context) {
-    Widget cell(
-        {required String emoji,
-        required String label,
-        required VoidCallback onTap}) {
+    Widget cell({
+      required String emoji,
+      required String label,
+      required Color tint,
+      required VoidCallback onTap,
+    }) {
       return Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -1385,18 +1459,35 @@ class _PregnancyToolkitGrid extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                  color: Colors.black.withValues(alpha: 0.85), width: 2),
+              border: Border.all(color: const Color(0xFFF0E6EA)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 30)),
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                ),
                 const SizedBox(height: 10),
                 Text(
                   label,
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: sans(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -1419,8 +1510,10 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '📋',
                 label: 'Birth plan',
+                tint: const Color(0xFFFFE4EE),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const BirthPlanScreen()),
+                  MaterialPageRoute<void>(
+                      builder: (_) => const BirthPlanScreen()),
                 ),
               ),
             ),
@@ -1429,10 +1522,14 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '📅',
                 label: 'Appointments',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const AppointmentsScreen()),
-                ),
+                tint: const Color(0xFFE8F0FE),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const AppointmentsScreen()),
+                  );
+                  onReturn();
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -1440,6 +1537,7 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '🌙',
                 label: 'Sleep tracker',
+                tint: const Color(0xFFEEF0FC),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                       builder: (_) => const SleepTrackerScreen()),
@@ -1455,6 +1553,7 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '🚨',
                 label: 'Warning signs',
+                tint: const Color(0xFFFFEBEE),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                       builder: (_) => const WarningSignsScreen()),
@@ -1466,8 +1565,10 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '✨',
                 label: 'Baby names',
+                tint: const Color(0xFFFFF3E0),
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const BabyNamesScreen()),
+                  MaterialPageRoute<void>(
+                      builder: (_) => const BabyNamesScreen()),
                 ),
               ),
             ),
@@ -1476,6 +1577,7 @@ class _PregnancyToolkitGrid extends StatelessWidget {
               child: cell(
                 emoji: '🤱',
                 label: 'Postpartum prep',
+                tint: const Color(0xFFE0F2F1),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                       builder: (_) => const PostpartumPrepScreen()),
@@ -1504,7 +1606,7 @@ class _QuickLinksRow extends StatelessWidget {
               child: _QuickLinkCard(
                 sans: sans,
                 emoji: '🧳',
-                label: 'Hospital\nBag',
+                label: 'Hospital bag',
                 bg: const Color(0xFFE6F7F2),
                 fgColor: const Color(0xFF1A8C6A),
                 onTap: () => Navigator.of(context).push(
@@ -1517,7 +1619,7 @@ class _QuickLinksRow extends StatelessWidget {
               child: _QuickLinkCard(
                 sans: sans,
                 emoji: '🎵',
-                label: 'Music &\nMantras',
+                label: 'Music & mantras',
                 bg: const Color(0xFFFFE4EE),
                 fgColor: const Color(0xFFE04B84),
                 onTap: () => Navigator.of(context).push(
@@ -1525,7 +1627,11 @@ class _QuickLinksRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: _QuickLinkCard(
                 sans: sans,
@@ -1538,16 +1644,12 @@ class _QuickLinksRow extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
+            const SizedBox(width: 12),
             Expanded(
               child: _QuickLinkCard(
                 sans: sans,
                 emoji: '🧘',
-                label: 'Yoga &\nExercise',
+                label: 'Yoga & exercise',
                 bg: const Color(0xFFD8F2EA),
                 fgColor: const Color(0xFF1A8C6A),
                 onTap: () => Navigator.of(context).push(
@@ -1588,7 +1690,7 @@ class _QuickLinkCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1597,6 +1699,8 @@ class _QuickLinkCard extends StatelessWidget {
               Text(
                 label,
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: sans(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,

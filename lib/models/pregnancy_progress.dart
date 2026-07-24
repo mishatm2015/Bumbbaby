@@ -1,8 +1,12 @@
 /// Pregnancy timeline math derived from the last menstrual period (LMP).
 ///
 /// A full-term pregnancy is measured as 280 days (40 weeks) from the LMP
-/// using Naegele's rule. Gestational age is expressed as completed
-/// weeks + days (e.g. "24 weeks 3 days").
+/// using Naegele's rule.
+///
+/// Two related numbers are exposed:
+/// - [weeks] + [dayOfWeek] → obstetric age, e.g. "24 weeks + 3 days"
+/// - [contentWeek] → which week you are *in* (1–40), matching common apps:
+///   `days ~/ 7 + 1` (days 0–6 = week 1, days 7–13 = week 2, …)
 class PregnancyProgress {
   const PregnancyProgress({
     required this.lmp,
@@ -35,16 +39,14 @@ class PregnancyProgress {
   int get daysElapsed => _rawDays.clamp(0, totalDays + 14);
 
   /// Completed weeks of gestation ("N weeks pregnant").
-  int get weeks => (daysElapsed ~/ 7);
+  int get weeks => daysElapsed ~/ 7;
 
-  /// Days into the current week (0–6).
+  /// Extra days into the current week (0–6).
   int get dayOfWeek => daysElapsed % 7;
 
-  /// Week number used to look up weekly content (1–40).
-  int get contentWeek {
-    final w = weeks == 0 ? 1 : weeks;
-    return w.clamp(1, totalWeeks);
-  }
+  /// Week number you are currently in (1–40).
+  /// Days 0–6 → week 1, days 7–13 → week 2, … matches [UserProfile.currentWeek].
+  int get contentWeek => ((daysElapsed ~/ 7) + 1).clamp(1, totalWeeks);
 
   /// Days remaining until the estimated due date (0–280).
   int get daysLeft => (totalDays - daysElapsed).clamp(0, totalDays);
@@ -61,6 +63,8 @@ class PregnancyProgress {
 
   bool get isFullTerm => weeks >= totalWeeks;
 
+  /// Trimester from completed gestational weeks.
+  /// 1st: < 13 weeks, 2nd: 13–26, 3rd: 27+.
   int get trimester {
     if (weeks < 13) return 1;
     if (weeks < 27) return 2;
@@ -89,8 +93,17 @@ class PregnancyProgress {
     }
   }
 
-  /// "WEEK 24 · DAY 3" style label.
-  String get weekDayLabel => 'WEEK $weeks · DAY $dayOfWeek';
+  /// Clear obstetric age, e.g. "24 weeks + 3 days".
+  String get weekDayLabel {
+    final w = weeks;
+    final d = dayOfWeek;
+    final weekPart = w == 1 ? '1 week' : '$w weeks';
+    final dayPart = d == 1 ? '1 day' : '$d days';
+    return '$weekPart + $dayPart';
+  }
+
+  /// Short badge, e.g. "Week 25".
+  String get weekBadge => 'Week $contentWeek';
 
   /// "168 days down, 112 to go".
   String get countdownLabel => '$daysElapsed days down, $daysLeft to go';
